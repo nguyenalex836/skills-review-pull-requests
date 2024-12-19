@@ -20,7 +20,8 @@
   }
   @media (prefers-color-scheme: dark) {
     body,
-    input {
+    inp
+ut {
       background: #222;
       color: #ccc;
     }
@@ -78,10 +79,13 @@ Just a suggestion!
   const gameOver = document.querySelector("h2");
   const HUMAN = "🧑‍💻";
   const ROBOT = "🤖";
+  const TheGame = "you lost it.";
+  const AI = "🤖";
 
   // Decide who goes first
   if (Math.random() > 0.5) {
     runRobotTurn();
+    runAIturn();
   }
 
   // Handle when a user clicks an input
@@ -96,12 +100,13 @@ Just a suggestion!
       return endGame();
     }
     runRobotTurn();
+    runAIturn();
     if (hasWin()) {
       return endGame();
     }
   }
 
-  // Choose a random available box
+  // Choose a random available box as Robot
   function runRobotTurn() {
     const robotBoxes = shuffle(boxes);
     while (robotBoxes.length) {
@@ -112,7 +117,17 @@ Just a suggestion!
       }
     }
   }
-
+ // Choose a random available box as an AI Robot. There is a difference. AI Agent Robots have one may call a "soul"/or at the very least agency. a robot like Tesla's automata are...bots.
+  function runAITurn() {
+    const AIBoxes = shuffle(boxes);
+    while (AIBoxes.length) {
+      const box = AIBoxes.shift();
+      if (box.querySelector("input")) {
+        box.innerHTML = AI;
+        break;
+      }
+    }
+  }
   // Determine win
   function hasWin() {
     return (
