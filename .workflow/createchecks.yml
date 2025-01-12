@@ -140,3 +140,171 @@ jobs:
           branch_name: update-game
 
       # Add more steps here for updating to step 3 and 4 if needed
+
+             - name: Merge Queue Action
+  # You may pin to the exact commit or the version.
+  # uses: autifyhq/merge-queue-action@fb39457c8938aaa5665a5b5c41c33e6a3dd52d9f
+  uses: autifyhq/merge-queue-action@v0.1.0
+          
+
+                   - name: Aspect Workflows
+  # You may pin to the exact commit or the version.
+  # uses: aspect-build/workflows-action@a2675918ae93f545dc34e70835b711bbf35e84b2
+  uses: aspect-build/workflows-action@5.9.24
+  with:
+    # path from the git repository to the WORKSPACE.bazel file
+    workspace: # default is .
+    # the task that we want to generate steps for and then run
+    task: 
+    # additional arguments to be passed to the task instance
+    args: # optional, default is 
+          
+
+    - name: run-sqlpackage
+  uses: Azure/run-sqlpackage-action@v1.0.0
+  with:
+    # Action parameter to run with SqlPackage. Supported values are: Publish, DeployReport, DriftReport, Script
+    action: 
+    # The path where to look for the DACPAC file. If multiple files exists, all of them are processed
+    sourcepath: 
+    # The profile path to use during the execution. It has to be an xml file
+    profile: 
+    # Database server URL (without protocol). If not indicated in the publishing profile, it has to be indicated here.
+    database-server: # optional, default is 
+    # Database name. If not indicated in the publishing profile, it has to be indicated here.
+    database-name: # optional, default is 
+    # The authentication token used to connect to the database, if credentials not indicated in the connection string
+    authtoken: # optional, default is 
+    # The output folder where assets will be generated if any
+    outputpath: # optional, default is .
+    # The output file name. The final name of the file will be [dacpac_name].[outputfile]
+    outputfile: # optional, default is deployreport.xml
+          
+
+name: Step 3, Leave a review
+
+# This step triggers after the user leaves a pull request review.
+# This workflow updates from step 3 to step 4.
+
+# This will run every time we leave a pull request review.
+# Reference: https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows
+on:
+  workflow_dispatch:
+  pull_request_review:
+    types:
+      - submitted
+
+# Reference: https://docs.github.com/en/actions/security-guides/automatic-token-authentication
+permissions:
+  # Need `contents: read` to checkout the repository.
+  # Need `contents: write` to update the step metadata.
+  contents: write
+
+jobs:
+  # Get the current step to only run the main job when the learner is on the same step.
+  get_current_step:
+    name: Check current step number
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+
+  on_leave_review:
+    name: On leave review
+    needs: get_current_step
+
+    # We will only run this action when:
+    # 1. This repository isn't the template repository.
+    # 2. The step is currently 3.
+    # Reference: https://docs.github.com/en/actions/learn-github-actions/contexts
+    # Reference: https://docs.github.com/en/actions/learn-github-actions/expressions
+    if: >-
+      ${{ !github.event.repository.is_template
+
+name: Ruleset Management
+
+on:
+  workflow_dispatch:
+    inputs:
+      repo_owner:
+        description: 'The owner of the repo (username or org name)'
+        required: true
+        default: ${{ github.repository_owner }}
+      repo_name:
+        description: 'The name of the repo'
+        required: true
+        default: ${{ github.repository }}
+      ruleset_name:
+        description: 'The name of the ruleset to update'
+        required: true
+        default: 'your-ruleset-name'
+      user_to_add:
+        description: 'The GitHub username to add with write permissions'
+        required: true
+        default: 'bearycool11'
+
+permissions:
+  # Since we're going to use the GitHub API, we need write permissions for admin operations.
+  admin: write
+
+jobs:
+  update_ruleset:
+    name: Update Ruleset Permissions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Update Ruleset via GitHub API
+        env:
+          GITHUB_TOKEN: ${{ secrets.ADMIN_PAT }}  # Use a PAT with admin permissions for the target repo
+        run: |
+          # Use inputs for flexibility
+          REPO_OWNER=${{ github.event.inputs.repo_owner }}
+          REPO_NAME=${{ github.event.inputs.repo_name }}
+          RULESET_NAME=${{ github.event.inputs.ruleset_name }}
+          USER_TO_ADD=${{ github.event.inputs.user_to_add }}
+
+          # Fetch the current ruleset
+          ruleset_id=$(curl -s -L \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/rulesets" | \
+            jq -r --arg name "$RULESET_NAME" '.[] | select(.name==$name) | .id')
+          
+          # If ruleset not found, exit with message
+          if [ -z "$ruleset_id" ]; then
+            echo "No ruleset with the specified name found"
+            exit 1
+          fi
+
+          # Update the ruleset to add write permissions for the specified user
+          curl -s -L -X PATCH \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            -d '{"bypass_actors": {"users": ["'"$USER_TO_ADD"'"]}}' \
+            "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/rulesets/$ruleset_id"
+
+          echo "Ruleset updated for $USER_TO_ADD with write access"
+
+      - name: Verify the Update
+        env:
+          GITHUB_TOKEN: ${{ secrets.ADMIN_PAT }}
+        run: |
+          # Verify the update by fetching the ruleset and checking the bypass actors
+          curl -s -L \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/rulesets/$ruleset_id" | \
+            jq -r '.bypass_actors.users[]'
