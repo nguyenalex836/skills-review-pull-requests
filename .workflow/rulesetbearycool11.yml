@@ -1,4 +1,4 @@
-name: Assign CODEOWNERS and Manage Ruleset
+name: Assign CODEOWNERS (bearycool11) and Manage Ruleset
 
 on:
   workflow_dispatch:
