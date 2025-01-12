@@ -1,0 +1,142 @@
+name: Create Checks
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write  # Added for creating pull requests in the welcome step
+
+jobs:
+  run_tests:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js environment  # Example for Node.js, adjust for your language
+        uses: actions/setup-node@v4.1.0
+        with:
+          node-version: '14'  # Specify your Node.js version
+
+      # Setup other environments like Java, Go, Python if needed
+      # - name: Setup Java JDK
+      #   uses: actions/setup-java@v4.6.0
+      #   with:
+      #     java-version: '11'
+      #     distribution: 'adopt'
+
+      # - name: Setup Go environment
+      #   uses: actions/setup-go@v5.2.0
+      #   with:
+      #     go-version: '1.17'
+
+      - name: Install dependencies
+        run: npm install  # Adjust based on your project setup
+
+      - name: Run Tests
+        run: |
+          npm test  # Or your specific test command
+
+      - name: Report Test Results
+        if: always()  # This step runs regardless of the previous step's success or failure
+        uses: dorny/test-reporter@v1
+        with:
+          name: Test Results
+          path: test-results.xml  # Assuming your test runner outputs results in this format
+          reporter: java-junit  # Adjust based on your test framework
+
+  welcome_step:
+    name: Step 0, Welcome
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get current step
+        id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+
+      - name: Run Tests
+        if: steps.get_step.outputs.current_step == 0
+        run: |
+          npm test || pytest || go test -v ./...  # Adjust based on your project's test command
+
+      - name: Prepare branch and pull request
+        if: steps.get_step.outputs.current_step == 0
+        run: |
+          echo "Make sure we are on step 0"
+          if [ "$(cat .github/steps/-step.txt)" != 0 ]
+          then
+            echo "Current step is not 0"
+            exit 0
+          fi
+          echo "Make a branch"
+          BRANCH=update-game
+          git checkout -b $BRANCH
+          echo "Update index.html"
+          sed -i.bak 's/Game over/Game over, refresh to play again 🧑‍💻 🤖!/' index.html
+          echo "Make a commit"
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add index.html
+          git commit --message="Update game over message"
+          echo "Push"
+          git push --set-upstream origin $BRANCH
+          echo "Restore main"
+          git checkout main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update to step 1
+        if: steps.get_step.outputs.current_step == 0
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 0
+          to_step: 1
+          branch_name: update-game
+
+  learning_workflow:
+    name: Learning Workflow
+    needs: run_tests  # Ensures tests are run before proceeding with other steps
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Get current step
+        id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+
+      - name: Assign Reviewers
+        if: steps.get_step.outputs.current_step == 1 && github.event.action == 'opened'
+        uses: kentaro-m/auto-assign-action@v2.0.0
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          reviewers: bearycool11,codingrabbitai
+          addReviewers: true
+          addAssignees: false
+
+      - name: Update Step from 1 to 2
+        if: steps.get_step.outputs.current_step == 1 && github.event.action == 'opened' && github.head_ref == 'update-game'
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 1
+          to_step: 2
+          branch_name: update-game
+
+      # Add more steps here for updating to step 3 and 4 if needed
