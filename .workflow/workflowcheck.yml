@@ -196,3 +196,655 @@ jobs:
           from_step: 2
           to_step: 3
           branch_name: update-game
+
+name: Step 2, Assign yourself
+
+# This step triggers after the user assigns themselves as a pull request reviewer.
+# This workflow updates from step 2 to step 3.
+
+# This will run every time someone is assigned as a pull request reviewer.
+# Reference: https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows
+on:
+  workflow_dispatch:
+  pull_request:
+    types:
+      - assigned
+      - review_requested
+
+# Reference: https://docs.github.com/en/actions/security-guides/automatic-token-authentication
+permissions:
+  # Need `contents: read` to checkout the repository.
+  # Need `contents: write` to update the step metadata.
+  contents: write
+
+jobs:
+  # Get the current step to only run the main job when the learner is on the same step.
+  get_current_step:
+    name: Check current step number
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+
+  on_assigned_reviewer:
+    name: On assigned reviewer
+    needs: get_current_step
+
+    # We will only run this action when:
+    # 1. This repository isn't the template repository.
+    # 2. The step is currently 2.
+    # Reference: https://docs.github.com/en/actions/learn-github-actions/contexts
+    # Reference: https://docs.github.com/en/actions/learn-github-actions/expressions
+    if: >-
+      ${{ !github.event.repository.is_template
+          && needs.get_current_step.outputs.current_step == 2 }}
+    # We'll run Ubuntu for performance instead of Mac or Windows.
+    runs-on: ubuntu-latest
+
+    steps:
+      # We'll need to check out the repository so that we can edit the README.
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Let's get all the branches.
+          ref: update-game
+
+      # In README.md, switch step 2 for step 3.
+      - name: Update to step 3
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 2
+          to_step: 3
+          branch_name: update-game
+
+name: Learning Workflow
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, reopened, assigned, review_requested]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: write
+
+jobs:
+  get_current_step:
+    name: Check Current Step Number
+    runs-on: ubuntu-latest
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+
+  handle_pull_request:
+    name: Handle Pull Request Events
+    needs: get_current_step
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template && (github.event_name == 'pull_request') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Assign Reviewers
+        if: ${{ needs.get_current_step.outputs.current_step == 1 && github.event.action == 'opened' }}
+        uses: kentaro-m/auto-assign-action@v2.0.0
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          reviewers: bearycool11,codingrabbitai
+          addReviewers: true
+          addAssignees: false
+
+      - name: Update Step from 1 to 2
+        if: ${{ needs.get_current_step.outputs.current_step == 1 && github.event.action == 'opened' && github.head_ref == 'update-game' }}
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 1
+          to_step: 2
+          branch_name: update-game
+
+      - name: Update Step from 2 to 3
+        if: ${{ needs.get_current_step.outputs.current_step == 2 && (github.event.action == 'assigned' || github.event.action == 'review_requested') }}
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 2
+          to_step: 3
+          branch_name: update-game
+
+  handle_review:
+    name: Handle Review Submission
+    needs: get_current_step
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template && needs.get_current_step.outputs.current_step == 3 && github.event_name == 'pull_request_review' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Update Step from 3 to 4
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 3
+          to_step: 4
+          branch_name: update-game
+name: Learning Workflow
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, reopened, assigned, review_requested]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: write
+
+jobs:
+  get_current_step:
+    name: Check Current Step Number
+    runs-on: ubuntu-latest
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+
+  handle_pull_request:
+    name: Handle Pull Request Events
+    needs: get_current_step
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template && (github.event_name == 'pull_request') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Assign Reviewers
+        if: ${{ needs.get_current_step.outputs.current_step == 1 && github.event.action == 'opened' }}
+        uses: kentaro-m/auto-assign-action@v2.0.0
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          reviewers: bearycool11,codingrabbitai
+          addReviewers: true
+          addAssignees: false
+
+      - name: Update Step from 1 to 2
+        if: ${{ needs.get_current_step.outputs.current_step == 1 && github.event.action == 'opened' && github.head_ref == 'update-game' }}
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 1
+          to_step: 2
+          branch_name: update-game
+
+      - name: Update Step from 2 to 3
+        if: ${{ needs.get_current_step.outputs.current_step == 2 && (github.event.action == 'assigned' || github.event.action == 'review_requested') }}
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 2
+          to_step: 3
+          branch_name: update-game
+
+  handle_review:
+    name: Handle Review Submission
+    needs: get_current_step
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template && needs.get_current_step.outputs.current_step == 3 && github.event_name == 'pull_request_review' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Update Step from 3 to 4
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 3
+          to_step: 4
+          branch_name: update-game
+
+name: Learning Workflow
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, reopened, assigned, review_requested]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: write
+
+jobs:
+  get_current_step:
+    name: Check Current Step Number
+    runs-on: ubuntu-latest
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+
+  handle_pull_request:
+    name: Handle Pull Request Events
+    needs: get_current_step
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template && (github.event_name == 'pull_request') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Assign Reviewers
+        if: ${{ needs.get_current_step.outputs.current_step == 1 && github.event.action == 'opened' }}
+        uses: kentaro-m/auto-assign-action@v2.0.0
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          reviewers: bearycool11,codingrabbitai
+          addReviewers: true
+          addAssignees: false
+
+      - name: Update Step from 1 to 2
+        if: ${{ needs.get_current_step.outputs.current_step == 1 && github.event.action == 'opened' && github.head_ref == 'update-game' }}
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 1
+          to_step: 2
+          branch_name: update-game
+
+      - name: Update Step from 2 to 3
+        if: ${{ needs.get_current_step.outputs.current_step == 2 && (github.event.action == 'assigned' || github.event.action == 'review_requested') }}
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 2
+          to_step: 3
+          branch_name: update-game
+
+  handle_review:
+    name: Handle Review Submission
+    needs: get_current_step
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template && needs.get_current_step.outputs.current_step == 3 && github.event_name == 'pull_request_review' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Update Step from 3 to 4
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 3
+          to_step: 4
+          branch_name: update-game
+
+name: Learning Workflow
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, reopened, assigned, review_requested]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: write
+
+jobs:
+  get_current_step:
+    name: Check Current Step Number
+    runs-on: ubuntu-latest
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+
+  handle_pull_request:
+    name: Handle Pull Request Events
+    needs: get_current_step
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template && (github.event_name == 'pull_request') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Assign Reviewers
+        if: ${{ needs.get_current_step.outputs.current_step == 1 && github.event.action == 'opened' }}
+        uses: kentaro-m/auto-assign-action@v2.0.0
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          reviewers: bearycool11,codingrabbitai
+          addReviewers: true
+          addAssignees: false
+
+      - name: Update Step from 1 to 2
+        if: ${{ needs.get_current_step.outputs.current_step == 1 && github.event.action == 'opened' && github.head_ref == 'update-game' }}
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 1
+          to_step: 2
+          branch_name: update-game
+
+      - name: Update Step from 2 to 3
+        if: ${{ needs.get_current_step.outputs.current_step == 2 && (github.event.action == 'assigned' || github.event.action == 'review_requested') }}
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 2
+          to_step: 3
+          branch_name: update-game
+
+  handle_review:
+    name: Handle Review Submission
+    needs: get_current_step
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template && needs.get_current_step.outputs.current_step == 3 && github.event_name == 'pull_request_review' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Update Step from 3 to 4
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 3
+          to_step: 4
+          branch_name: update-game
+
+name: Learning Workflow
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, reopened, assigned, review_requested]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: write
+
+jobs:
+  get_current_step:
+    name: Check Current Step Number
+    runs-on: ubuntu-latest
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+
+  handle_pull_request:
+    name: Handle Pull Request Events
+    needs: get_current_step
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template && (github.event_name == 'pull_request') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Assign Reviewers
+        if: ${{ needs.get_current_step.outputs.current_step == 1 && github.event.action == 'opened' }}
+        uses: kentaro-m/auto-assign-action@v2.0.0
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          reviewers: bearycool11,codingrabbitai
+          addReviewers: true
+          addAssignees: false
+
+      - name: Update Step from 1 to 2
+        if: ${{ needs.get_current_step.outputs.current_step == 1 && github.event.action == 'opened' && github.head_ref == 'update-game' }}
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 1
+          to_step: 2
+          branch_name: update-game
+
+      - name: Update Step from 2 to 3
+        if: ${{ needs.get_current_step.outputs.current_step == 2 && (github.event.action == 'assigned' || github.event.action == 'review_requested') }}
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 2
+          to_step: 3
+          branch_name: update-game
+
+  handle_review:
+    name: Handle Review Submission
+    needs: get_current_step
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template && needs.get_current_step.outputs.current_step == 3 && github.event_name == 'pull_request_review' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Update Step from 3 to 4
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 3
+          to_step: 4
+          branch_name: update-game
+
+name: Learning Workflow
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, reopened, assigned, review_requested]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: write
+
+jobs:
+  get_current_step:
+    name: Check Current Step Number
+    runs-on: ubuntu-latest
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+
+  handle_pull_request:
+    name: Handle Pull Request Events
+    needs: get_current_step
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template && (github.event_name == 'pull_request') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Assign Reviewers
+        if: ${{ needs.get_current_step.outputs.current_step == 1 && github.event.action == 'opened' }}
+        uses: kentaro-m/auto-assign-action@v2.0.0
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          reviewers: bearycool11,codingrabbitai
+          addReviewers: true
+          addAssignees: false
+
+      - name: Update Step from 1 to 2
+        if: ${{ needs.get_current_step.outputs.current_step == 1 && github.event.action == 'opened' && github.head_ref == 'update-game' }}
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 1
+          to_step: 2
+          branch_name: update-game
+
+      - name: Update Step from 2 to 3
+        if: ${{ needs.get_current_step.outputs.current_step == 2 && (github.event.action == 'assigned' || github.event.action == 'review_requested') }}
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 2
+          to_step: 3
+          branch_name: update-game
+
+  handle_review:
+    name: Handle Review Submission
+    needs: get_current_step
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template && needs.get_current_step.outputs.current_step == 3 && github.event_name == 'pull_request_review' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Update Step from 3 to 4
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 3
+          to_step: 4
+          branch_name: update-game
+name: Learning Workflow
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, reopened, assigned, review_requested]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: write
+
+jobs:
+  get_current_step:
+    name: Check Current Step Number
+    runs-on: ubuntu-latest
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+
+  handle_pull_request:
+    name: Handle Pull Request Events
+    needs: get_current_step
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template && (github.event_name == 'pull_request') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Assign Reviewers
+        if: ${{ needs.get_current_step.outputs.current_step == 1 && github.event.action == 'opened' }}
+        uses: kentaro-m/auto-assign-action@v2.0.0
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          reviewers: bearycool11,codingrabbitai
+          addReviewers: true
+          addAssignees: false
+
+      - name: Update Step from 1 to 2
+        if: ${{ needs.get_current_step.outputs.current_step == 1 && github.event.action == 'opened' && github.head_ref == 'update-game' }}
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 1
+          to_step: 2
+          branch_name: update-game
+
+      - name: Update Step from 2 to 3
+        if: ${{ needs.get_current_step.outputs.current_step == 2 && (github.event.action == 'assigned' || github.event.action == 'review_requested') }}
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 2
+          to_step: 3
+          branch_name: update-game
+
+  handle_review:
+    name: Handle Review Submission
+    needs: get_current_step
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template && needs.get_current_step.outputs.current_step == 3 && github.event_name == 'pull_request_review' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Update Step from 3 to 4
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 3
+          to_step: 4
+          branch_name: update-game
