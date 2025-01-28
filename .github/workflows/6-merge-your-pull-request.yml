@@ -1,3 +1,179 @@
+name: All Workflows
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, assigned, review_requested, submitted]
+  pull_request_review:
+    types: [submitted]
+  push:
+    branches:
+      - main
+      - develop
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  # First Interaction Job
+  first_interaction_job:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.action == 'opened'
+    steps:
+      - name: Do something for the first interaction
+        uses: actions/first-interaction@v1.3.0
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          issue-message: "Thanks for opening your first issue!"
+          pr-message: "Thanks for opening your first PR!"
+
+  # Step 2: Assign Yourself Job
+  get_current_step_assign:
+    name: Check current step number for assignment
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && (github.event.action == 'assigned' || github.event.action == 'review_requested')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+
+  on_assigned_reviewer:
+    name: On assigned reviewer
+    needs: get_current_step_assign
+    runs-on: ubuntu-latest
+    if: >-
+      ${{ !github.event.repository.is_template
+          && needs.get_current_step_assign.outputs.current_step == 2 }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+      - name: Update to step 3
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 2
+          to_step: 3
+          branch_name: update-game
+
+  # Step 3: Leave a Review Job
+  get_current_step_review:
+    name: Check current step number for review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request_review' && github.event.action == 'submitted'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+
+  on_leave_review:
+    name: On leave review
+    needs: get_current_step_review
+    runs-on: ubuntu-latest
+    if: >-
+      ${{ !github.event.repository.is_template
+          && needs.get_current_step_review.outputs.current_step == 3 }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+      - name: Update to step 4
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 3
+          to_step: 4
+          branch_name: update-game
+
+  # Step 6: Merge PR Job
+  get_current_step_merge:
+    name: Check current step number for merge
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+
+  on_merge:
+    name: On merge
+    needs: get_current_step_merge
+    runs-on: ubuntu-latest
+    if: >-
+      ${{ !github.event.repository.is_template
+          && needs.get_current_step_merge.outputs.current_step == 6 }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Update to step X
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 6
+          to_step: X
+          branch_name: update-game
+
+  # CodeRabbitAI Workflow Job
+  run-coderabbit-ai:
+    name: Code Review with CodeRabbitAI
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18.x"
+      - name: Install CodeRabbit AI CLI
+        run: npm install -g coderabbit-cli
+      - name: Run CodeRabbit Analysis
+        run: |
+          coderabbit analyze \
+            --branch ${{ github.head_ref || github.ref_name }} \
+            --output report.json \
+            --token ${{ secrets.CODERABBIT_API_TOKEN }}
+      - name: Annotate Pull Request with Results
+        run: |
+          coderabbit upload \
+            --branch ${{ github.head_ref || github.ref_name }} \
+            --token ${{ secrets.CODERABBIT_API_TOKEN }}
+      - name: Run Tests
+        if: always()
+        run: npm test
+      - name: Complete Workflow
+        run: echo "CodeRabbit AI analysis completed."
+
+  notify-results:
+    name: Notify Results
+    runs-on: ubuntu-latest
+    needs: run-coderabbit-ai
+    steps:
+      - name: Notify Team
+        run: |
+          echo "CodeRabbit Analysis completed on branch ${{ github.head_ref || github.ref_name }}"
+       
        name: First interaction
   uses: actions/first-interaction@v1.3.0
   with:
