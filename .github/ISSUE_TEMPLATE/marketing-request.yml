@@ -15,21 +15,18 @@ body:
       label: "Campaign Name"
       description: "Insert campaign name or description"
       placeholder: "e.g., Developer Onboarding Campaign"
-      required: true
   - type: input
     id: target_audience
     attributes:
       label: "Target Audience"
       description: "Insert target audience, e.g., new developers, security teams, etc."
       placeholder: "e.g., New GitHub Users"
-      required: true
   - type: textarea
     id: campaign_goal
     attributes:
       label: "Primary Goal of Campaign"
       description: "Insert primary goal, e.g., onboarding users to a specific GitHub product or feature"
       placeholder: "e.g., Educate developers on using GitHub Advanced Security (GHAS)"
-      required: true
   - type: dropdown
     id: content_type
     attributes:
@@ -40,53 +37,45 @@ body:
         - "Use-Case-Based Learning"
         - "Tutorials"
         - "Other"
-      required: true
   - type: textarea
     id: specific_topics
     attributes:
       label: "Specific Topics or Features"
       description: "List specific topics or features you'd like covered"
       placeholder: "e.g., Code scanning, secret scanning, dependency management"
-      required: false
   - type: input
     id: preferred_format
     attributes:
       label: "Preferred Format"
       description: "E.g., blog posts, documentation, videos, etc."
       placeholder: "e.g., Blog Post"
-      required: false
   - type: input
     id: deadline
     attributes:
       label: "Deadline for Content Submission"
       description: "Insert deadline"
       placeholder: "e.g., 2025-05-01"
-      required: true
   - type: input
     id: launch_date
     attributes:
       label: "Expected Launch Date for Campaign"
       description: "Insert launch date"
       placeholder: "e.g., 2025-06-01"
-      required: false
   - type: input
     id: requestor_name
     attributes:
       label: "Requestor Name"
       description: "Your name"
       placeholder: "e.g., Alex Nguyen"
-      required: true
   - type: input
     id: email
     attributes:
       label: "Email Address"
       description: "Your email"
       placeholder: "e.g., alex.nguyen@example.com"
-      required: true
   - type: textarea
     id: additional_context
     attributes:
       label: "Additional Information"
       description: "Provide any additional context, campaign goals, or related materials"
       placeholder: "e.g., Links to previous campaigns, specific challenges to address"
-      required: false
