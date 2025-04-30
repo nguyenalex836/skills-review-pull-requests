@@ -1,0 +1,1565 @@
+name: Step 0, Welcome
+
+# This step triggers after the learner creates a new repository from the template.
+# This workflow updates from step 0 to step 1.
+
+# This will run every time we create push a commit to `main`.
+# Reference: https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+# Reference: https://docs.github.com/en/actions/security-guides/automatic-token-authentication
+permissions:
+  # Need `contents: read` to checkout the repository.
+  # Need `contents: write` to update the step metadata.
+  # Need `pull-requests: write` to create a pull request.
+  contents: write
+  pull-requests: write
+
+jobs:
+  # Get the current step to only run the main job when the learner is on the same step.
+  get_current_step:
+    name: Check current step number
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+
+  on_start:
+    name: On start
+    needs: get_current_step
+
+    # We will only run this action when:
+    # 1. This repository isn't the template repository.
+    # 2. The step is currently 0.
+    # Reference: https://docs.github.com/en/actions/learn-github-actions/contexts
+    # Reference: https://docs.github.com/en/actions/learn-github-actions/expressions
+    if: >-
+      ${{ !github.event.repository.is_template
+          && needs.get_current_step.outputs.current_step == 0 }}
+    # We'll run Ubuntu for performance instead of Mac or Windows.
+    runs-on: ubuntu-latest
+
+    steps:
+      # We'll need to check out the repository so that we can edit the README.
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Let's get all the branches.
+
+      # Create update-game branch, update game, and create pull request for the learner.
+      - name: Prepare a branch and pull request
+        run: |
+          echo "Make sure we are on step 0"
+          if [ "$(cat .github/steps/-step.txt)" != 0 ]
+          then
+            echo "Current step is not 0"
+            exit 0
+          fi
+          echo "Make a branch"
+          BRANCH=update-game
+          git checkout -b $BRANCH
+          echo "Update index.html"
+          sed -i.bak 's/Game over/Game over, refresh to play again 🧑‍💻 🤖!/' index.html
+          echo "Make a commit"
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add index.html
+          git commit --message="Update game over message"
+          echo "Push"
+          git push --set-upstream origin $BRANCH
+          echo "Restore main"
+          git checkout main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # In README.md, switch step 0 for step 1.
+      - name: Update to step 1
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 0
+          to_step: 1
+          branch_name: update-game
+
+name: Step 1, Open a pull request
+
+# This step listens for the learner to open a pull request with branch `update-game`.
+# This workflow updates from step 1 to step 2.
+
+# This will run every time we create a branch or tag.
+# Reference: https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows
+on:
+  workflow_dispatch:
+  pull_request:
+    types:
+      - opened
+      - reopened
+
+# Reference: https://docs.github.com/en/actions/security-guides/automatic-token-authentication
+permissions:
+  # Need `contents: read` to checkout the repository.
+  # Need `contents: write` to update the step metadata.
+  contents: write
+
+jobs:
+  # Get the current step to only run the main job when the learner is on the same step.
+  get_current_step:
+    name: Check current step number
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+
+  on_open_a_pull_request:
+    name: On open a pull request
+    needs: get_current_step
+
+    # We will only run this action when:
+    # 1. This repository isn't the template repository.
+    # 2. The step is currently 1.
+    # 3. The head branch name is `update-game`.
+    # Reference: https://docs.github.com/en/actions/learn-github-actions/contexts
+    # Reference: https://docs.github.com/en/actions/learn-github-actions/expressions
+    if: >-
+      ${{ !github.event.repository.is_template
+          && needs.get_current_step.outputs.current_step == 1
+          && github.head_ref == 'update-game' }}
+    # We'll run Ubuntu for performance instead of Mac or Windows.
+    runs-on: ubuntu-latest
+
+    steps:
+      # We'll need to check out the repository so that we can edit the README.
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Let's get all the branches.
+          ref: update-game # Important, as normally `pull_request` event won't grab other branches.
+
+      # In README.md, switch step 1 for step 2.
+      - name: Update to step 2
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 1
+          to_step: 2
+          branch_name: update-game
+
+name: Step 3, Leave a review
+
+# This step triggers after the user leaves a pull request review.
+# This workflow updates from step 3 to step 4.
+
+# This will run every time we leave a pull request review.
+# Reference: https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows
+on:
+  workflow_dispatch:
+  pull_request_review:
+    types:
+      - submitted
+
+# Reference: https://docs.github.com/en/actions/security-guides/automatic-token-authentication
+permissions:
+  # Need `contents: read` to checkout the repository.
+  # Need `contents: write` to update the step metadata.
+  contents: write
+
+jobs:
+  # Get the current step to only run the main job when the learner is on the same step.
+  get_current_step:
+    name: Check current step number
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+
+  on_leave_review:
+    name: On leave review
+    needs: get_current_step
+
+    # We will only run this action when:
+    # 1. This repository isn't the template repository.
+    # 2. The step is currently 3.
+    # Reference: https://docs.github.com/en/actions/learn-github-actions/contexts
+    # Reference: https://docs.github.com/en/actions/learn-github-actions/expressions
+    if: >-
+      ${{ !github.event.repository.is_template
+          && needs.get_current_step.outputs.current_step == 3 }}
+    # We'll run Ubuntu for performance instead of Mac or Windows.
+    runs-on: ubuntu-latest
+
+    steps:
+      # We'll need to check out the repository so that we can edit the README.
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Let's get all the branches.
+          ref: update-game
+
+      # In README.md, switch step 3 for step 4.
+      - name: Update to step 4
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 3
+          to_step: 4
+          branch_name: update-game
+
+name: Step 2, Assign yourself
+
+# This step triggers after the user assigns themselves as a pull request reviewer.
+# This workflow updates from step 2 to step 3.
+
+# This will run every time someone is assigned as a pull request reviewer.
+# Reference: https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows
+on:
+  workflow_dispatch:
+  pull_request:
+    types:
+      - assigned
+      - review_requested
+
+# Reference: https://docs.github.com/en/actions/security-guides/automatic-token-authentication
+permissions:
+  # Need `contents: read` to checkout the repository.
+  # Need `contents: write` to update the step metadata.
+  contents: write
+
+jobs:
+  # Get the current step to only run the main job when the learner is on the same step.
+  get_current_step:
+    name: Check current step number
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+
+  on_assigned_reviewer:
+    name: On assigned reviewer
+    needs: get_current_step
+
+    # We will only run this action when:
+    # 1. This repository isn't the template repository.
+    # 2. The step is currently 2.
+    # Reference: https://docs.github.com/en/actions/learn-github-actions/contexts
+    # Reference: https://docs.github.com/en/actions/learn-github-actions/expressions
+    if: >-
+      ${{ !github.event.repository.is_template
+          && needs.get_current_step.outputs.current_step == 2 }}
+    # We'll run Ubuntu for performance instead of Mac or Windows.
+    runs-on: ubuntu-latest
+
+    steps:
+      # We'll need to check out the repository so that we can edit the README.
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Let's get all the branches.
+          ref: update-game
+
+      # In README.md, switch step 2 for step 3.
+      - name: Update to step 3
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 2
+          to_step: 3
+          branch_name: update-game
+
+name: Step 2, Assign yourself
+
+# This step triggers after the user assigns themselves as a pull request reviewer.
+# This workflow updates from step 2 to step 3.
+
+# This will run every time someone is assigned as a pull request reviewer.
+# Reference: https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows
+on:
+  workflow_dispatch:
+  pull_request:
+    types:
+      - assigned
+      - review_requested
+
+# Reference: https://docs.github.com/en/actions/security-guides/automatic-token-authentication
+permissions:
+  # Need `contents: read` to checkout the repository.
+  # Need `contents: write` to update the step metadata.
+  contents: write
+
+jobs:
+  # Get the current step to only run the main job when the learner is on the same step.
+  get_current_step:
+    name: Check current step number
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+
+  on_assigned_reviewer:
+    name: On assigned reviewer
+    needs: get_current_step
+
+    # We will only run this action when:
+    # 1. This repository isn't the template repository.
+    # 2. The step is currently 2.
+    # Reference: https://docs.github.com/en/actions/learn-github-actions/contexts
+    # Reference: https://docs.github.com/en/actions/learn-github-actions/expressions
+    if: >-
+      ${{ !github.event.repository.is_template
+          && needs.get_current_step.outputs.current_step == 2 }}
+    # We'll run Ubuntu for performance instead of Mac or Windows.
+    runs-on: ubuntu-latest
+
+    steps:
+      # We'll need to check out the repository so that we can edit the README.
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Let's get all the branches.
+          ref: update-game
+
+      # In README.md, switch step 2 for step 3.
+      - name: Update to step 3
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 2
+          to_step: 3
+          branch_name: update-game
+
+name: Learning Workflow
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, reopened, assigned, review_requested]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: write
+
+jobs:
+  get_current_step:
+    name: Check Current Step Number
+    runs-on: ubuntu-latest
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+
+  handle_pull_request:
+    name: Handle Pull Request Events
+    needs: get_current_step
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template && (github.event_name == 'pull_request') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Assign Reviewers
+        if: ${{ needs.get_current_step.outputs.current_step == 1 && github.event.action == 'opened' }}
+        uses: kentaro-m/auto-assign-action@v2.0.0
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          reviewers: bearycool11,codingrabbitai
+          addReviewers: true
+          addAssignees: false
+
+      - name: Update Step from 1 to 2
+        if: ${{ needs.get_current_step.outputs.current_step == 1 && github.event.action == 'opened' && github.head_ref == 'update-game' }}
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 1
+          to_step: 2
+          branch_name: update-game
+
+      - name: Update Step from 2 to 3
+        if: ${{ needs.get_current_step.outputs.current_step == 2 && (github.event.action == 'assigned' || github.event.action == 'review_requested') }}
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 2
+          to_step: 3
+          branch_name: update-game
+
+  handle_review:
+    name: Handle Review Submission
+    needs: get_current_step
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template && needs.get_current_step.outputs.current_step == 3 && github.event_name == 'pull_request_review' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Update Step from 3 to 4
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 3
+          to_step: 4
+          branch_name: update-game
+name: Learning Workflow
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, reopened, assigned, review_requested]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: write
+
+jobs:
+  get_current_step:
+    name: Check Current Step Number
+    runs-on: ubuntu-latest
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+
+  handle_pull_request:
+    name: Handle Pull Request Events
+    needs: get_current_step
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template && (github.event_name == 'pull_request') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Assign Reviewers
+        if: ${{ needs.get_current_step.outputs.current_step == 1 && github.event.action == 'opened' }}
+        uses: kentaro-m/auto-assign-action@v2.0.0
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          reviewers: bearycool11,codingrabbitai
+          addReviewers: true
+          addAssignees: false
+
+      - name: Update Step from 1 to 2
+        if: ${{ needs.get_current_step.outputs.current_step == 1 && github.event.action == 'opened' && github.head_ref == 'update-game' }}
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 1
+          to_step: 2
+          branch_name: update-game
+
+      - name: Update Step from 2 to 3
+        if: ${{ needs.get_current_step.outputs.current_step == 2 && (github.event.action == 'assigned' || github.event.action == 'review_requested') }}
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 2
+          to_step: 3
+          branch_name: update-game
+
+  handle_review:
+    name: Handle Review Submission
+    needs: get_current_step
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template && needs.get_current_step.outputs.current_step == 3 && github.event_name == 'pull_request_review' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Update Step from 3 to 4
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 3
+          to_step: 4
+          branch_name: update-game
+
+name: Learning Workflow
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, reopened, assigned, review_requested]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: write
+
+jobs:
+  get_current_step:
+    name: Check Current Step Number
+    runs-on: ubuntu-latest
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+
+  handle_pull_request:
+    name: Handle Pull Request Events
+    needs: get_current_step
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template && (github.event_name == 'pull_request') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Assign Reviewers
+        if: ${{ needs.get_current_step.outputs.current_step == 1 && github.event.action == 'opened' }}
+        uses: kentaro-m/auto-assign-action@v2.0.0
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          reviewers: bearycool11,codingrabbitai
+          addReviewers: true
+          addAssignees: false
+
+      - name: Update Step from 1 to 2
+        if: ${{ needs.get_current_step.outputs.current_step == 1 && github.event.action == 'opened' && github.head_ref == 'update-game' }}
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 1
+          to_step: 2
+          branch_name: update-game
+
+      - name: Update Step from 2 to 3
+        if: ${{ needs.get_current_step.outputs.current_step == 2 && (github.event.action == 'assigned' || github.event.action == 'review_requested') }}
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 2
+          to_step: 3
+          branch_name: update-game
+
+  handle_review:
+    name: Handle Review Submission
+    needs: get_current_step
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template && needs.get_current_step.outputs.current_step == 3 && github.event_name == 'pull_request_review' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Update Step from 3 to 4
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 3
+          to_step: 4
+          branch_name: update-game
+
+name: Learning Workflow
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, reopened, assigned, review_requested]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: write
+
+jobs:
+  get_current_step:
+    name: Check Current Step Number
+    runs-on: ubuntu-latest
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+
+  handle_pull_request:
+    name: Handle Pull Request Events
+    needs: get_current_step
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template && (github.event_name == 'pull_request') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Assign Reviewers
+        if: ${{ needs.get_current_step.outputs.current_step == 1 && github.event.action == 'opened' }}
+        uses: kentaro-m/auto-assign-action@v2.0.0
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          reviewers: bearycool11,codingrabbitai
+          addReviewers: true
+          addAssignees: false
+
+      - name: Update Step from 1 to 2
+        if: ${{ needs.get_current_step.outputs.current_step == 1 && github.event.action == 'opened' && github.head_ref == 'update-game' }}
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 1
+          to_step: 2
+          branch_name: update-game
+
+      - name: Update Step from 2 to 3
+        if: ${{ needs.get_current_step.outputs.current_step == 2 && (github.event.action == 'assigned' || github.event.action == 'review_requested') }}
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 2
+          to_step: 3
+          branch_name: update-game
+
+  handle_review:
+    name: Handle Review Submission
+    needs: get_current_step
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template && needs.get_current_step.outputs.current_step == 3 && github.event_name == 'pull_request_review' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Update Step from 3 to 4
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 3
+          to_step: 4
+          branch_name: update-game
+
+name: Learning Workflow
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, reopened, assigned, review_requested]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: write
+
+jobs:
+  get_current_step:
+    name: Check Current Step Number
+    runs-on: ubuntu-latest
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+
+  handle_pull_request:
+    name: Handle Pull Request Events
+    needs: get_current_step
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template && (github.event_name == 'pull_request') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Assign Reviewers
+        if: ${{ needs.get_current_step.outputs.current_step == 1 && github.event.action == 'opened' }}
+        uses: kentaro-m/auto-assign-action@v2.0.0
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          reviewers: bearycool11,codingrabbitai
+          addReviewers: true
+          addAssignees: false
+
+      - name: Update Step from 1 to 2
+        if: ${{ needs.get_current_step.outputs.current_step == 1 && github.event.action == 'opened' && github.head_ref == 'update-game' }}
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 1
+          to_step: 2
+          branch_name: update-game
+
+      - name: Update Step from 2 to 3
+        if: ${{ needs.get_current_step.outputs.current_step == 2 && (github.event.action == 'assigned' || github.event.action == 'review_requested') }}
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 2
+          to_step: 3
+          branch_name: update-game
+
+  handle_review:
+    name: Handle Review Submission
+    needs: get_current_step
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template && needs.get_current_step.outputs.current_step == 3 && github.event_name == 'pull_request_review' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Update Step from 3 to 4
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 3
+          to_step: 4
+          branch_name: update-game
+
+name: Learning Workflow
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, reopened, assigned, review_requested]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: write
+
+jobs:
+  get_current_step:
+    name: Check Current Step Number
+    runs-on: ubuntu-latest
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+
+  handle_pull_request:
+    name: Handle Pull Request Events
+    needs: get_current_step
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template && (github.event_name == 'pull_request') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Assign Reviewers
+        if: ${{ needs.get_current_step.outputs.current_step == 1 && github.event.action == 'opened' }}
+        uses: kentaro-m/auto-assign-action@v2.0.0
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          reviewers: bearycool11,codingrabbitai
+          addReviewers: true
+          addAssignees: false
+
+      - name: Update Step from 1 to 2
+        if: ${{ needs.get_current_step.outputs.current_step == 1 && github.event.action == 'opened' && github.head_ref == 'update-game' }}
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 1
+          to_step: 2
+          branch_name: update-game
+
+      - name: Update Step from 2 to 3
+        if: ${{ needs.get_current_step.outputs.current_step == 2 && (github.event.action == 'assigned' || github.event.action == 'review_requested') }}
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 2
+          to_step: 3
+          branch_name: update-game
+
+  handle_review:
+    name: Handle Review Submission
+    needs: get_current_step
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template && needs.get_current_step.outputs.current_step == 3 && github.event_name == 'pull_request_review' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Update Step from 3 to 4
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 3
+          to_step: 4
+          branch_name: update-game
+name: Learning Workflow
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, reopened, assigned, review_requested]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: write
+
+jobs:
+  get_current_step:
+    name: Check Current Step Number
+    runs-on: ubuntu-latest
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+
+  handle_pull_request:
+    name: Handle Pull Request Events
+    needs: get_current_step
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template && (github.event_name == 'pull_request') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Assign Reviewers
+        if: ${{ needs.get_current_step.outputs.current_step == 1 && github.event.action == 'opened' }}
+        uses: kentaro-m/auto-assign-action@v2.0.0
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          reviewers: bearycool11,codingrabbitai
+          addReviewers: true
+          addAssignees: false
+
+      - name: Update Step from 1 to 2
+        if: ${{ needs.get_current_step.outputs.current_step == 1 && github.event.action == 'opened' && github.head_ref == 'update-game' }}
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 1
+          to_step: 2
+          branch_name: update-game
+
+      - name: Update Step from 2 to 3
+        if: ${{ needs.get_current_step.outputs.current_step == 2 && (github.event.action == 'assigned' || github.event.action == 'review_requested') }}
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 2
+          to_step: 3
+          branch_name: update-game
+
+  handle_review:
+    name: Handle Review Submission
+    needs: get_current_step
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template && needs.get_current_step.outputs.current_step == 3 && github.event_name == 'pull_request_review' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Update Step from 3 to 4
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 3
+          to_step: 4
+          branch_name: update-game
+
+- name: Merge Queue Action
+  # You may pin to the exact commit or the version.
+  # uses: autifyhq/merge-queue-action@fb39457c8938aaa5665a5b5c41c33e6a3dd52d9f
+  uses: autifyhq/merge-queue-action@v0.1.0
+          
+
+                   - name: Aspect Workflows
+  # You may pin to the exact commit or the version.
+  # uses: aspect-build/workflows-action@a2675918ae93f545dc34e70835b711bbf35e84b2
+  uses: aspect-build/workflows-action@5.9.24
+  with:
+    # path from the git repository to the WORKSPACE.bazel file
+    workspace: # default is .
+    # the task that we want to generate steps for and then run
+    task: 
+    # additional arguments to be passed to the task instance
+    args: # optional, default is 
+          
+
+    - name: run-sqlpackage
+  uses: Azure/run-sqlpackage-action@v1.0.0
+  with:
+    # Action parameter to run with SqlPackage. Supported values are: Publish, DeployReport, DriftReport, Script
+    action: 
+    # The path where to look for the DACPAC file. If multiple files exists, all of them are processed
+    sourcepath: 
+    # The profile path to use during the execution. It has to be an xml file
+    profile: 
+    # Database server URL (without protocol). If not indicated in the publishing profile, it has to be indicated here.
+    database-server: # optional, default is 
+    # Database name. If not indicated in the publishing profile, it has to be indicated here.
+    database-name: # optional, default is 
+    # The authentication token used to connect to the database, if credentials not indicated in the connection string
+    authtoken: # optional, default is 
+    # The output folder where assets will be generated if any
+    outputpath: # optional, default is .
+    # The output file name. The final name of the file will be [dacpac_name].[outputfile]
+    outputfile: # optional, default is deployreport.xml
+          
+
+name: Step 3, Leave a review
+
+# This step triggers after the user leaves a pull request review.
+# This workflow updates from step 3 to step 4.
+
+# This will run every time we leave a pull request review.
+# Reference: https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows
+on:
+  workflow_dispatch:
+  pull_request_review:
+    types:
+      - submitted
+
+# Reference: https://docs.github.com/en/actions/security-guides/automatic-token-authentication
+permissions:
+  # Need `contents: read` to checkout the repository.
+  # Need `contents: write` to update the step metadata.
+  contents: write
+
+jobs:
+  # Get the current step to only run the main job when the learner is on the same step.
+  get_current_step:
+    name: Check current step number
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+
+  on_leave_review:
+    name: On leave review
+    needs: get_current_step
+
+    # We will only run this action when:
+    # 1. This repository isn't the template repository.
+    # 2. The step is currently 3.
+    # Reference: https://docs.github.com/en/actions/learn-github-actions/contexts
+    # Reference: https://docs.github.com/en/actions/learn-github-actions/expressions
+    if: >-
+      ${{ !github.event.repository.is_template
+          && needs.get_current_step.outputs.current_step == 3 }}
+
+    # We'll run Ubuntu for performance instead of Mac or Windows.
+    runs-on: ubuntu-latest
+
+    steps:
+      # We'll need to check out the repository so that we can edit the README.
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Let's get all the branches.
+          ref: update-game
+
+      # In README.md, switch step 3 for step 4.
+      - name: Update to step 4
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 3
+          to_step: 4
+          branch_name: update-game
+            - name: First interaction
+  uses: actions/first-interaction@v1.3.0
+  with:
+    # Token for the repository. Can be passed in using {{ secrets.GITHUB_TOKEN }}
+    repo-token: 
+    # Comment to post on an individual's first issue
+    issue-message: # optional
+    # Comment to post on an individual's first pull request
+    pr-message: # optional
+          
+
+            - name: Setup Node.js environment
+  uses: actions/setup-node@v4.1.0
+  with:
+    # Set always-auth in npmrc.
+    always-auth: # optional, default is false
+    # Version Spec of the version to use. Examples: 12.x, 10.15.1, >=10.15.0.
+    node-version: # optional
+    # File containing the version Spec of the version to use.  Examples: package.json, .nvmrc, .node-version, .tool-versions.
+    node-version-file: # optional
+    # Target architecture for Node to use. Examples: x86, x64. Will use system architecture by default.
+    architecture: # optional
+    # Set this option if you want the action to check for the latest available version that satisfies the version spec.
+    check-latest: # optional
+    # Optional registry to set up for auth. Will set the registry in a project level .npmrc and .yarnrc file, and set up auth to read in from env.NODE_AUTH_TOKEN.
+    registry-url: # optional
+    # Optional scope for authenticating against scoped registries. Will fall back to the repository owner when using the GitHub Packages registry (https://npm.pkg.github.com/).
+    scope: # optional
+    # Used to pull node distributions from node-versions. Since there's a default, this is typically not supplied by the user. When running this action on github.com, the default value is sufficient. When running on GHES, you can pass a personal access token for github.com if you are experiencing rate limiting.
+    token: # optional, default is ${{ github.server_url == 'https://github.com' && github.token || '' }}
+    # Used to specify a package manager for caching in the default directory. Supported values: npm, yarn, pnpm.
+    cache: # optional
+    # Used to specify the path to a dependency file: package-lock.json, yarn.lock, etc. Supports wildcards or a list of file names for caching multiple dependencies.
+    cache-dependency-path: # optional
+            - name: Setup Java JDK
+  uses: actions/setup-java@v4.6.0
+  with:
+    # The Java version to set up. Takes a whole or semver Java version. See examples of supported syntax in README file
+    java-version: # optional
+    # The path to the `.java-version` file. See examples of supported syntax in README file
+    java-version-file: # optional
+    # Java distribution. See the list of supported distributions in README file
+    distribution: 
+    # The package type (jdk, jre, jdk+fx, jre+fx)
+    java-package: # optional, default is jdk
+    # The architecture of the package (defaults to the action runner's architecture)
+    architecture: # optional
+    # Path to where the compressed JDK is located
+    jdkFile: # optional
+    # Set this option if you want the action to check for the latest available version that satisfies the version spec
+    check-latest: # optional
+    # ID of the distributionManagement repository in the pom.xml file. Default is `github`
+    server-id: # optional, default is github
+    # Environment variable name for the username for authentication to the Apache Maven repository. Default is $GITHUB_ACTOR
+    server-username: # optional, default is GITHUB_ACTOR
+    # Environment variable name for password or token for authentication to the Apache Maven repository. Default is $GITHUB_TOKEN
+    server-password: # optional, default is GITHUB_TOKEN
+    # Path to where the settings.xml file will be written. Default is ~/.m2.
+    settings-path: # optional
+    # Overwrite the settings.xml file if it exists. Default is "true".
+    overwrite-settings: # optional, default is true
+    # GPG private key to import. Default is empty string.
+    gpg-private-key: # optional
+    # Environment variable name for the GPG private key passphrase. Default is $GPG_PASSPHRASE.
+    gpg-passphrase: # optional
+    # Name of the build platform to cache dependencies. It can be "maven", "gradle" or "sbt".
+    cache: # optional
+    # The path to a dependency file: pom.xml, build.gradle, build.sbt, etc. This option can be used with the `cache` option. If this option is omitted, the action searches for the dependency file in the entire repository. This option supports wildcards and a list of file names for caching multiple dependencies.
+    cache-dependency-path: # optional
+    # Workaround to pass job status to post job step. This variable is not intended for manual setting
+    job-status: # optional, default is ${{ job.status }}
+    # The token used to authenticate when fetching version manifests hosted on github.com, such as for the Microsoft Build of OpenJDK. When running this action on github.com, the default value is sufficient. When running on GHES, you can pass a personal access token for github.com if you are experiencing rate limiting.
+    token: # optional, default is ${{ github.server_url == 'https://github.com' && github.token || '' }}
+    # Name of Maven Toolchain ID if the default name of "${distribution}_${java-version}" is not wanted. See examples of supported syntax in Advanced Usage file
+    mvn-toolchain-id: # optional
+    # Name of Maven Toolchain Vendor if the default name of "${distribution}" is not wanted. See examples of supported syntax in Advanced Usage file
+    mvn-toolchain-vendor: # optional
+
+            - name: Setup Go environment
+  uses: actions/setup-go@v5.2.0
+  with:
+    # The Go version to download (if necessary) and use. Supports semver spec and ranges. Be sure to enclose this option in single quotation marks.
+    go-version: # optional
+    # Path to the go.mod or go.work file.
+    go-version-file: # optional
+    # Set this option to true if you want the action to always check for the latest available version that satisfies the version spec
+    check-latest: # optional
+    # Used to pull Go distributions from go-versions. Since there's a default, this is typically not supplied by the user. When running this action on github.com, the default value is sufficient. When running on GHES, you can pass a personal access token for github.com if you are experiencing rate limiting.
+    token: # optional, default is ${{ github.server_url == 'https://github.com' && github.token || '' }}
+    # Used to specify whether caching is needed. Set to true, if you'd like to enable caching.
+    cache: # optional, default is true
+    # Used to specify the path to a dependency file - go.sum
+    cache-dependency-path: # optional
+    # Target architecture for Go to use. Examples: x86, x64. Will use system architecture by default.
+    architecture: # optional
+          
+            - name: Close Stale Issues
+  uses: actions/stale@v9.0.0
+  with:
+    # Token for the repository. Can be passed in using `{{ secrets.GITHUB_TOKEN }}`.
+    repo-token: # optional, default is ${{ github.token }}
+    # The message to post on the issue when tagging it. If none provided, will not mark issues stale.
+    stale-issue-message: # optional
+    # The message to post on the pull request when tagging it. If none provided, will not mark pull requests stale.
+    stale-pr-message: # optional
+    # The message to post on the issue when closing it. If none provided, will not comment when closing an issue.
+    close-issue-message: # optional
+    # The message to post on the pull request when closing it. If none provided, will not comment when closing a pull requests.
+    close-pr-message: # optional
+    # The number of days old an issue or a pull request can be before marking it stale. Set to -1 to never mark issues or pull requests as stale automatically.
+    days-before-stale: # optional, default is 60
+    # The number of days old an issue can be before marking it stale. Set to -1 to never mark issues as stale automatically. Override "days-before-stale" option regarding only the issues.
+    days-before-issue-stale: # optional
+    # The number of days old a pull request can be before marking it stale. Set to -1 to never mark pull requests as stale automatically. Override "days-before-stale" option regarding only the pull requests.
+    days-before-pr-stale: # optional
+    # The number of days to wait to close an issue or a pull request after it being marked stale. Set to -1 to never close stale issues or pull requests.
+    days-before-close: # optional, default is 7
+    # The number of days to wait to close an issue after it being marked stale. Set to -1 to never close stale issues. Override "days-before-close" option regarding only the issues.
+    days-before-issue-close: # optional
+    # The number of days to wait to close a pull request after it being marked stale. Set to -1 to never close stale pull requests. Override "days-before-close" option regarding only the pull requests.
+    days-before-pr-close: # optional
+    # The label to apply when an issue is stale.
+    stale-issue-label: # optional, default is Stale
+    # The label to apply when an issue is closed.
+    close-issue-label: # optional
+    # The labels that mean an issue is exempt from being marked stale. Separate multiple labels with commas (eg. "label1,label2").
+    exempt-issue-labels: # optional, default is 
+    # The reason to use when closing an issue.
+    close-issue-reason: # optional, default is not_planned
+    # The label to apply when a pull request is stale.
+    stale-pr-label: # optional, default is Stale
+    # The label to apply when a pull request is closed.
+    close-pr-label: # optional
+    # The labels that mean a pull request is exempt from being marked as stale. Separate multiple labels with commas (eg. "label1,label2").
+    exempt-pr-labels: # optional, default is 
+    # The milestones that mean an issue or a pull request is exempt from being marked as stale. Separate multiple milestones with commas (eg. "milestone1,milestone2").
+    exempt-milestones: # optional, default is 
+    # The milestones that mean an issue is exempt from being marked as stale. Separate multiple milestones with commas (eg. "milestone1,milestone2"). Override "exempt-milestones" option regarding only the issues.
+    exempt-issue-milestones: # optional, default is 
+    # The milestones that mean a pull request is exempt from being marked as stale. Separate multiple milestones with commas (eg. "milestone1,milestone2"). Override "exempt-milestones" option regarding only the pull requests.
+    exempt-pr-milestones: # optional, default is 
+    # Exempt all issues and pull requests with milestones from being marked as stale. Default to false.
+    exempt-all-milestones: # optional, default is false
+    # Exempt all issues with milestones from being marked as stale. Override "exempt-all-milestones" option regarding only the issues.
+    exempt-all-issue-milestones: # optional, default is 
+    # Exempt all pull requests with milestones from being marked as stale. Override "exempt-all-milestones" option regarding only the pull requests.
+    exempt-all-pr-milestones: # optional, default is 
+    # Only issues or pull requests with all of these labels are checked if stale. Defaults to `` (disabled) and can be a comma-separated list of labels.
+    only-labels: # optional, default is 
+    # Only issues or pull requests with at least one of these labels are checked if stale. Defaults to `` (disabled) and can be a comma-separated list of labels.
+    any-of-labels: # optional, default is 
+    # Only issues with at least one of these labels are checked if stale. Defaults to `` (disabled) and can be a comma-separated list of labels. Override "any-of-labels" option regarding only the issues.
+    any-of-issue-labels: # optional, default is 
+    # Only pull requests with at least one of these labels are checked if stale. Defaults to `` (disabled) and can be a comma-separated list of labels. Override "any-of-labels" option regarding only the pull requests.
+    any-of-pr-labels: # optional, default is 
+    # Only issues with all of these labels are checked if stale. Defaults to `[]` (disabled) and can be a comma-separated list of labels. Override "only-labels" option regarding only the issues.
+    only-issue-labels: # optional, default is 
+    # Only pull requests with all of these labels are checked if stale. Defaults to `[]` (disabled) and can be a comma-separated list of labels. Override "only-labels" option regarding only the pull requests.
+    only-pr-labels: # optional, default is 
+    # The maximum number of operations per run, used to control rate limiting (GitHub API CRUD related).
+    operations-per-run: # optional, default is 30
+    # Remove stale labels from issues and pull requests when they are updated or commented on.
+    remove-stale-when-updated: # optional, default is true
+    # Remove stale labels from issues when they are updated or commented on. Override "remove-stale-when-updated" option regarding only the issues.
+    remove-issue-stale-when-updated: # optional, default is 
+    # Remove stale labels from pull requests when they are updated or commented on. Override "remove-stale-when-updated" option regarding only the pull requests.
+    remove-pr-stale-when-updated: # optional, default is 
+    # Run the processor in debug mode without actually performing any operations on live issues.
+    debug-only: # optional, default is false
+    # The order to get issues or pull requests. Defaults to false, which is descending.
+    ascending: # optional, default is false
+    # Delete the git branch after closing a stale pull request.
+    delete-branch: # optional, default is false
+    # The date used to skip the stale action on issue/pull request created before it (ISO 8601 or RFC 2822).
+    start-date: # optional, default is 
+    # The assignees which exempt an issue or a pull request from being marked as stale. Separate multiple assignees with commas (eg. "user1,user2").
+    exempt-assignees: # optional, default is 
+    # The assignees which exempt an issue from being marked as stale. Separate multiple assignees with commas (eg. "user1,user2"). Override "exempt-assignees" option regarding only the issues.
+    exempt-issue-assignees: # optional, default is 
+    # The assignees which exempt a pull request from being marked as stale. Separate multiple assignees with commas (eg. "user1,user2"). Override "exempt-assignees" option regarding only the pull requests.
+    exempt-pr-assignees: # optional, default is 
+    # Exempt all issues and pull requests with assignees from being marked as stale. Default to false.
+    exempt-all-assignees: # optional, default is false
+    # Exempt all issues with assignees from being marked as stale. Override "exempt-all-assignees" option regarding only the issues.
+    exempt-all-issue-assignees: # optional, default is 
+    # Exempt all pull requests with assignees from being marked as stale. Override "exempt-all-assignees" option regarding only the pull requests.
+    exempt-all-pr-assignees: # optional, default is 
+    # Exempt draft pull requests from being marked as stale. Default to false.
+    exempt-draft-pr: # optional, default is false
+    # Display some statistics at the end regarding the stale workflow (only when the logs are enabled).
+    enable-statistics: # optional, default is true
+    # A comma delimited list of labels to add when an issue or pull request becomes unstale.
+    labels-to-add-when-unstale: # optional, default is 
+    # A comma delimited list of labels to remove when an issue or pull request becomes stale.
+    labels-to-remove-when-stale: # optional, default is 
+    # A comma delimited list of labels to remove when an issue or pull request becomes unstale.
+    labels-to-remove-when-unstale: # optional, default is 
+    # Any update (update/comment) can reset the stale idle time on the issues and pull requests.
+    ignore-updates: # optional, default is false
+    # Any update (update/comment) can reset the stale idle time on the issues. Override "ignore-updates" option regarding only the issues.
+    ignore-issue-updates: # optional, default is 
+    # Any update (update/comment) can reset the stale idle time on the pull requests. Override "ignore-updates" option regarding only the pull requests.
+    ignore-pr-updates: # optional, default is 
+    # Only the issues or the pull requests with an assignee will be marked as stale automatically.
+    include-only-assigned: # optional, default is name: Create Checks
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write  # Added for creating pull requests in the welcome step
+
+jobs:
+  run_tests:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js environment  # Example for Node.js, adjust for your language
+        uses: actions/setup-node@v4.1.0
+        with:
+          node-version: '14'  # Specify your Node.js version
+
+      # Setup other environments like Java, Go, Python if needed
+      # - name: Setup Java JDK
+      #   uses: actions/setup-java@v4.6.0
+      #   with:
+      #     java-version: '11'
+      #     distribution: 'adopt'
+
+      # - name: Setup Go environment
+      #   uses: actions/setup-go@v5.2.0
+      #   with:
+      #     go-version: '1.17'
+
+      - name: Install dependencies
+        run: npm install  # Adjust based on your project setup
+
+      - name: Run Tests
+        run: |
+          npm test  # Or your specific test command
+
+      - name: Report Test Results
+        if: always()  # This step runs regardless of the previous step's success or failure
+        uses: dorny/test-reporter@v1
+        with:
+          name: Test Results
+          path: test-results.xml  # Assuming your test runner outputs results in this format
+          reporter: java-junit  # Adjust based on your test framework
+
+  welcome_step:
+    name: Step 0, Welcome
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get current step
+        id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+
+      - name: Run Tests
+        if: steps.get_step.outputs.current_step == 0
+        run: |
+          npm test || pytest || go test -v ./...  # Adjust based on your project's test command
+
+      - name: Prepare branch and pull request
+        if: steps.get_step.outputs.current_step == 0
+        run: |
+          echo "Make sure we are on step 0"
+          if [ "$(cat .github/steps/-step.txt)" != 0 ]
+          then
+            echo "Current step is not 0"
+            exit 0
+          fi
+          echo "Make a branch"
+          BRANCH=update-game
+          git checkout -b $BRANCH
+          echo "Update index.html"
+          sed -i.bak 's/Game over/Game over, refresh to play again 🧑‍💻 🤖!/' index.html
+          echo "Make a commit"
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add index.html
+          git commit --message="Update game over message"
+          echo "Push"
+          git push --set-upstream origin $BRANCH
+          echo "Restore main"
+          git checkout main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update to step 1
+        if: steps.get_step.outputs.current_step == 0
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 0
+          to_step: 1
+          branch_name: update-game
+
+  learning_workflow:
+    name: Learning Workflow
+    needs: run_tests  # Ensures tests are run before proceeding with other steps
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+
+      - name: Get current step
+        id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+
+      - name: Assign Reviewers
+        if: steps.get_step.outputs.current_step == 1 && github.event.action == 'opened'
+        uses: kentaro-m/auto-assign-action@v2.0.0
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          reviewers: bearycool11,codingrabbitai
+          addReviewers: true
+          addAssignees: false
+
+      - name: Update Step from 1 to 2
+        if: steps.get_step.outputs.current_step == 1 && github.event.action == 'opened' && github.head_ref == 'update-game'
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 1
+          to_step: 2
+          branch_name: update-game
+
+      # Add more steps here for updating to step 3 and 4 if needed
+
+             - name: Merge Queue Action
+  # You may pin to the exact commit or the version.
+  # uses: autifyhq/merge-queue-action@fb39457c8938aaa5665a5b5c41c33e6a3dd52d9f
+  uses: autifyhq/merge-queue-action@v0.1.0
+          
+
+                   - name: Aspect Workflows
+  # You may pin to the exact commit or the version.
+  # uses: aspect-build/workflows-action@a2675918ae93f545dc34e70835b711bbf35e84b2
+  uses: aspect-build/workflows-action@5.9.24
+  with:
+    # path from the git repository to the WORKSPACE.bazel file
+    workspace: # default is .
+    # the task that we want to generate steps for and then run
+    task: 
+    # additional arguments to be passed to the task instance
+    args: # optional, default is 
+          
+
+    - name: run-sqlpackage
+  uses: Azure/run-sqlpackage-action@v1.0.0
+  with:
+    # Action parameter to run with SqlPackage. Supported values are: Publish, DeployReport, DriftReport, Script
+    action: 
+    # The path where to look for the DACPAC file. If multiple files exists, all of them are processed
+    sourcepath: 
+    # The profile path to use during the execution. It has to be an xml file
+    profile: 
+    # Database server URL (without protocol). If not indicated in the publishing profile, it has to be indicated here.
+    database-server: # optional, default is 
+    # Database name. If not indicated in the publishing profile, it has to be indicated here.
+    database-name: # optional, default is 
+    # The authentication token used to connect to the database, if credentials not indicated in the connection string
+    authtoken: # optional, default is 
+    # The output folder where assets will be generated if any
+    outputpath: # optional, default is .
+    # The output file name. The final name of the file will be [dacpac_name].[outputfile]
+    outputfile: # optional, default is deployreport.xml
+          
+
+name: Step 3, Leave a review
+
+# This step triggers after the user leaves a pull request review.
+# This workflow updates from step 3 to step 4.
+
+# This will run every time we leave a pull request review.
+# Reference: https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows
+on:
+  workflow_dispatch:
+  pull_request_review:
+    types:
+      - submitted
+
+# Reference: https://docs.github.com/en/actions/security-guides/automatic-token-authentication
+permissions:
+  # Need `contents: read` to checkout the repository.
+  # Need `contents: write` to update the step metadata.
+  contents: write
+
+jobs:
+  # Get the current step to only run the main job when the learner is on the same step.
+  get_current_step:
+    name: Check current step number
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+
+  on_leave_review:
+    name: On leave review
+    needs: get_current_step
+
+    # We will only run this action when:
+    # 1. This repository isn't the template repository.
+    # 2. The step is currently 3.
+    # Reference: https://docs.github.com/en/actions/learn-github-actions/contexts
+    # Reference: https://docs.github.com/en/actions/learn-github-actions/expressions
+    if: >-
+      ${{ !github.event.repository.is_template
+
+name: Ruleset Management
+
+on:
+  workflow_dispatch:
+    inputs:
+      repo_owner:
+        description: 'The owner of the repo (username or org name)'
+        required: true
+        default: ${{ github.repository_owner }}
+      repo_name:
+        description: 'The name of the repo'
+        required: true
+        default: ${{ github.repository }}
+      ruleset_name:
+        description: 'The name of the ruleset to update'
+        required: true
+        default: 'your-ruleset-name'
+      user_to_add:
+        description: 'The GitHub username to add with write permissions'
+        required: true
+        default: 'bearycool11'
+
+permissions:
+  # Since we're going to use the GitHub API, we need write permissions for admin operations.
+  admin: write
+
+jobs:
+  update_ruleset:
+    name: Update Ruleset Permissions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Update Ruleset via GitHub API
+        env:
+          GITHUB_TOKEN: ${{ secrets.ADMIN_PAT }}  # Use a PAT with admin permissions for the target repo
+        run: |
+          # Use inputs for flexibility
+          REPO_OWNER=${{ github.event.inputs.repo_owner }}
+          REPO_NAME=${{ github.event.inputs.repo_name }}
+          RULESET_NAME=${{ github.event.inputs.ruleset_name }}
+          USER_TO_ADD=${{ github.event.inputs.user_to_add }}
+
+          # Fetch the current ruleset
+          ruleset_id=$(curl -s -L \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/rulesets" | \
+            jq -r --arg name "$RULESET_NAME" '.[] | select(.name==$name) | .id')
+          
+          # If ruleset not found, exit with message
+          if [ -z "$ruleset_id" ]; then
+            echo "No ruleset with the specified name found"
+            exit 1
+          fi
+
+          # Update the ruleset to add write permissions for the specified user
+          curl -s -L -X PATCH \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            -d '{"bypass_actors": {"users": ["'"$USER_TO_ADD"'"]}}' \
+            "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/rulesets/$ruleset_id"
+
+          echo "Ruleset updated for $USER_TO_ADD with write access"
+
+      - name: Verify the Update
+        env:
+          GITHUB_TOKEN: ${{ secrets.ADMIN_PAT }}
+        run: |
+          # Verify the update by fetching the ruleset and checking the bypass actors
+          curl -s -L \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/rulesets/$ruleset_id" | \
+            jq -r '.bypass_actors.users[]'    
+          
+          
+
