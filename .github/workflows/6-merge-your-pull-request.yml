@@ -1,3 +1,191 @@
+name: All Workflows
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, assigned, review_requested, submitted]
+  pull_request_review:
+    types: [submitted]
+  push:
+    branches:
+      - main
+      - develop
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  # First Interaction Job
+  first_interaction_job:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.action == 'opened'
+    steps:
+      - name: Do something for the first interaction
+        uses: actions/first-interaction@v1.3.0
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          issue-message: "Thanks for opening your first issue!"
+          pr-message: "Thanks for opening your first PR!"
+
+  # Step 2: Assign Yourself Job
+  get_current_step_assign:
+    name: Check current step number for assignment
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && (github.event.action == 'assigned' || github.event.action == 'review_requested')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+
+  on_assigned_reviewer:
+    name: On assigned reviewer
+    needs: get_current_step_assign
+    runs-on: ubuntu-latest
+    if: >-
+      ${{ !github.event.repository.is_template
+          && needs.get_current_step_assign.outputs.current_step == 2 }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+      - name: Update to step 3
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 2
+          to_step: 3
+          branch_name: update-game
+
+  # Step 3: Leave a Review Job
+  get_current_step_review:
+    name: Check current step number for review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request_review' && github.event.action == 'submitted'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+
+  on_leave_review:
+    name: On leave review
+    needs: get_current_step_review
+    runs-on: ubuntu-latest
+    if: >-
+      ${{ !github.event.repository.is_template
+          && needs.get_current_step_review.outputs.current_step == 3 }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update-game
+      - name: Update to step 4
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 3
+          to_step: 4
+          branch_name: update-game
+
+  # Step 6: Merge PR Job
+  get_current_step_merge:
+    name: Check current step number for merge
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+
+  on_merge:
+    name: On merge
+    needs: get_current_step_merge
+    runs-on: ubuntu-latest
+    if: >-
+      ${{ !github.event.repository.is_template
+          && needs.get_current_step_merge.outputs.current_step == 6 }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Update to step X
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 6
+          to_step: X
+          branch_name: update-game
+
+  # CodeRabbitAI Workflow Job
+  run-coderabbit-ai:
+    name: Code Review with CodeRabbitAI
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18.x"
+      - name: Install CodeRabbit AI CLI
+        run: npm install -g coderabbit-cli
+      - name: Run CodeRabbit Analysis
+        run: |
+          coderabbit analyze \
+            --branch ${{ github.head_ref || github.ref_name }} \
+            --output report.json \
+            --token ${{ secrets.CODERABBIT_API_TOKEN }}
+      - name: Annotate Pull Request with Results
+        run: |
+          coderabbit upload \
+            --branch ${{ github.head_ref || github.ref_name }} \
+            --token ${{ secrets.CODERABBIT_API_TOKEN }}
+      - name: Run Tests
+        if: always()
+        run: npm test
+      - name: Complete Workflow
+        run: echo "CodeRabbit AI analysis completed."
+
+  notify-results:
+    name: Notify Results
+    runs-on: ubuntu-latest
+    needs: run-coderabbit-ai
+    steps:
+      - name: Notify Team
+        run: |
+          echo "CodeRabbit Analysis completed on branch ${{ github.head_ref || github.ref_name }}"
+       
+       name: First interaction
+  uses: actions/first-interaction@v1.3.0
+  with:
+    # Token for the repository. Can be passed in using {{ secrets.GITHUB_TOKEN }}
+    repo-token: 
+    # Comment to post on an individual's first issue
+    issue-message: # optional
+    # Comment to post on an individual's first pull request
+    pr-message: # optional
+
+          
+
 name: Step 6, Merge your pull request
 
 # This step triggers after a pull requst is merged to `main`.
@@ -62,3 +250,331 @@ jobs:
           from_step: 6
           to_step: X
           branch_name: update-game
+name: Step 2, Assign yourself
+
+# This step triggers after the user assigns themselves as a pull request reviewer.
+# This workflow updates from step 2 to step 3.
+
+# This will run every time someone is assigned as a pull request reviewer.
+# Reference: https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows
+on:
+  workflow_dispatch:
+  pull_request:
+    types:
+      - assigned
+      - review_requested
+
+# Reference: https://docs.github.com/en/actions/security-guides/automatic-token-authentication
+permissions:
+  # Need `contents: read` to checkout the repository.
+  # Need `contents: write` to update the step metadata.
+  contents: write
+
+jobs:
+  # Get the current step to only run the main job when the learner is on the same step.
+  get_current_step:
+    name: Check current step number
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+
+  on_assigned_reviewer:
+    name: On assigned reviewer
+    needs: get_current_step
+
+    # We will only run this action when:
+    # 1. This repository isn't the template repository.
+    # 2. The step is currently 2.
+    # Reference: https://docs.github.com/en/actions/learn-github-actions/contexts
+    # Reference: https://docs.github.com/en/actions/learn-github-actions/expressions
+    if: >-
+      ${{ !github.event.repository.is_template
+          && needs.get_current_step.outputs.current_step == 2 }}
+
+    # We'll run Ubuntu for performance instead of Mac or Windows.
+    runs-on: ubuntu-latest
+
+    steps:
+      # We'll need to check out the repository so that we can edit the README.
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Let's get all the branches.
+          ref: update-game
+
+      # In README.md, switch step 2 for step 3.
+      - name: Update to step 3
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 2
+          to_step: 3
+          branch_name: update-game
+riginal file line number
+Diff line number
+Diff line change
+@@ -1,4 +1,23 @@
+
+name: Step 0, Welcome
+
++ - name: Setup .NET Core SDK
+
+  uses: actions/setup-dotnet@v4.2.0
+
+  with:
+
+    # Optional SDK version(s) to use. If not provided, will install global.json version when available. Examples: 2.2.104, 3.1, 3.1.x, 3.x, 6.0.2xx
+
+    dotnet-version: # optional
+
+    # Optional quality of the build. The possible values are: daily, signed, validated, preview, ga.
+
+    dotnet-quality: # optional
+
+    # Optional global.json location, if your global.json isn't located in the root of the repo.
+
+    global-json-file: # optional
+
+    # Optional package source for which to set up authentication. Will consult any existing NuGet.config in the root of the repo and provide a temporary NuGet.config using the NUGET_AUTH_TOKEN environment variable as a ClearTextPassword
+
+    source-url: # optional
+
+    # Optional OWNER for using packages from GitHub Package Registry organizations/users other than the current repository's owner. Only used if a GPR URL is also provided in source-url
+
+    owner: # optional
+
+    # Optional NuGet.config location, if your NuGet.config isn't located in the root of the repo.
+
+    config-file: # optional
+
+    # Optional input to enable caching of the NuGet global-packages folder
+
+    cache: # optional
+
+    # Used to specify the path to a dependency file: packages.lock.json. Supports wildcards or a list of file names for caching multiple dependencies.
+
+    cache-dependency-path: # optional
+
+          name: Step 0, Welcome
+
+
+
+# This step triggers after the learner creates a new repository from the template.
+
+# This workflow updates from step 0 to step 1.
+
+
+@@ -95,3 +114,70 @@ jobs:
+
+          from_step: 0
+
+          to_step: 1
+
+          branch_name: update-game
+
+name: Step 1, Open a pull request
+
+
+
+# This step listens for the learner to open a pull request with branch `update-game`.
+
+# This workflow updates from step 1 to step 2.
+
+
+
+# This will run every time we create a branch or tag.
+
+# Reference: https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows
+
+on:
+
+  workflow_dispatch:
+
+  pull_request:
+
+    types:
+
+      - opened
+
+      - reopened
+
+
+
+# Reference: https://docs.github.com/en/actions/security-guides/automatic-token-authentication
+
+permissions:
+
+  # Need `contents: read` to checkout the repository.
+
+  # Need `contents: write` to update the step metadata.
+
+  contents: write
+
+
+
+jobs:
+
+  # Get the current step to only run the main job when the learner is on the same step.
+
+  get_current_step:
+
+    name: Check current step number
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout
+
+        uses: actions/checkout@v4
+
+      - id: get_step
+
+        run: |
+
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+
+    outputs:
+
+      current_step: ${{ steps.get_step.outputs.current_step }}
+
+
+
+  on_open_a_pull_request:
+
+    name: On open a pull request
+
+    needs: get_current_step
+
+
+
+    # We will only run this action when:
+
+    # 1. This repository isn't the template repository.
+
+    # 2. The step is currently 1.
+
+    # 3. The head branch name is `update-game`.
+
+    # Reference: https://docs.github.com/en/actions/learn-github-actions/contexts
+
+    # Reference: https://docs.github.com/en/actions/learn-github-actions/expressions
+
+    if: >-
+
+      ${{ !github.event.repository.is_template
+
+          && needs.get_current_step.outputs.current_step == 1
+
+          && github.head_ref == 'update-game' }}
+
+    # We'll run Ubuntu for performance instead of Mac or Windows.
+
+    runs-on: ubuntu-latest
+
+
+
+    steps:
+
+      # We'll need to check out the repository so that we can edit the README.
+
+      - name: Checkout
+
+        uses: actions/checkout@v4
+
+        with:
+
+          fetch-depth: 0 # Let's get all the branches.
+
+          ref: update-game # Important, as normally `pull_request` event won't grab other branches.
+
+
+
+      # In README.md, switch step 1 for step 2.
+
+      - name: Update to step 2
+
+        uses: skills/action-update-step@v2
+
+        with:
+
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+          from_step: 1
+
+          to_step: 2
+
+          branch_name: update-game
+Footer
+
+© 2025 GitHub, Inc.
+Footer navigation
+		Terms
+		Privacy
+		Security
+name: Step 3, Leave a review
+
+# This step triggers after the user leaves a pull request review.
+# This workflow updates from step 3 to step 4.
+
+# This will run every time we leave a pull request review.
+# Reference: https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows
+on:
+  workflow_dispatch:
+  pull_request_review:
+    types:
+      - submitted
+
+# Reference: https://docs.github.com/en/actions/security-guides/automatic-token-authentication
+permissions:
+  # Need `contents: read` to checkout the repository.
+  # Need `contents: write` to update the step metadata.
+  contents: write
+
+jobs:
+  # Get the current step to only run the main job when the learner is on the same step.
+  get_current_step:
+    name: Check current step number
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+
+  on_leave_review:
+    name: On leave review
+    needs: get_current_step
+
+    # We will only run this action when:
+    # 1. This repository isn't the template repository.
+    # 2. The step is currently 3.
+    # Reference: https://docs.github.com/en/actions/learn-github-actions/contexts
+    # Reference: https://docs.github.com/en/actions/learn-github-actions/expressions
+    if: >-
+      ${{ !github.event.repository.is_template
+          && needs.get_current_step.outputs.current_step == 3 }}
+
+    # We'll run Ubuntu for performance instead of Mac or Windows.
+    runs-on: ubuntu-latest
+
+    steps:
+      # We'll need to check out the repository so that we can edit the README.
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Let's get all the branches.
+          ref: update-game
+
+      # In README.md, switch step 3 for step 4.
+      - name: Update to step 4
+        uses: skills/action-update-step@v2
